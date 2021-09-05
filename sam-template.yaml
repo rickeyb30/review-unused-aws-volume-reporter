@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  SNSTopicName:
+    Type: String
+    Description: Name of the SNS topic where the report will be published.
+    Default: empty-s3Bucket
+  LambdaSchedule:
+    Type: String
+    Description: |
+      CRON expression for when you want the Lambda function to run.
+      Default is 4 PM UTC = 9 AM PDT. CRON expression must be in UTC.
+    Default: cron(0 16 * * ? *)
+
+Resources:
+  UnusedIAMReporter:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: empty-s3Bucket-reporter
+      Runtime: python3.8
+      Timeout: 900
+      Handler: index.lambda_handler
+      Policies:
+        - IAMReadOnlyAccess
+        - SNSPublishMessagePolicy:
+            TopicName: !Ref SNSTopicName
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${SNSTopicName}
+      Events:
+        Schedule:
+          Type: Schedule
+          Properties:
+            Name: empty-s3Bucket-reporter
+            Schedule: !Ref LambdaSchedule
+      InlineCode: |
+        import os
+        import datetime
+        import boto3
+                
+        s3 = boto3.client('s3')
+        sns = boto3.client('sns')
+
+        def lambda_handler(event, context):
+            report = ''
+            
+            response = s3.list_buckets()
+            
+            for i in response['Buckets']:
+                try:
+                    bucketname = i['Name']
+                    response = s3.list_objects(Bucket=bucketname)
+                    if 'Contents' in response:
+                        print(bucketname)
+                        print("objects present")
+                    else:
+                        report += 'Empty Bucket Name: {0}. \n'.format(bucketname)
+
+                except Exception as e:
+                    print(e)
+                    pass
+                print('-----------------------------')
+
+            if report:
+                print(report)
+                sns.publish(TopicArn=os.environ['SNS_TOPIC_ARN'], Subject='Empty S3 Bucket', Message=report)    
