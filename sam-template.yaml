@@ -22,7 +22,7 @@ Resources:
       Timeout: 900
       Handler: index.lambda_handler
       Policies:
-        - S3ReadOnlyAccess
+        - AmazonS3ReadOnlyAccess
         - SNSPublishMessagePolicy:
             TopicName: !Ref SNSTopicName
       Environment:
