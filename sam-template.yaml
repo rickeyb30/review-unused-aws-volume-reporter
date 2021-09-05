@@ -14,7 +14,7 @@ Parameters:
     Default: cron(0 16 * * ? *)
 
 Resources:
-  UnusedIAMReporter:
+  EmptyS3BucketReporter:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: empty-s3Bucket-reporter
