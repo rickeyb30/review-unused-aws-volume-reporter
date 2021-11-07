@@ -5,7 +5,7 @@ Parameters:
   SNSTopicName:
     Type: String
     Description: Name of the SNS topic where the report will be published.
-    Default: empty-s3Bucket
+    Default: review-unused-IAM
   LambdaSchedule:
     Type: String
     Description: |
@@ -14,15 +14,15 @@ Parameters:
     Default: cron(0 16 * * ? *)
 
 Resources:
-  EmptyS3BucketReporter:
+  UnusedIAMReporter:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: empty-s3Bucket-reporter
+      FunctionName: review-unusedIAM-reporter
       Runtime: python3.8
       Timeout: 900
       Handler: index.lambda_handler
       Policies:
-        - AmazonS3ReadOnlyAccess
+        - AmazonIAMReadOnlyAccess
         - SNSPublishMessagePolicy:
             TopicName: !Ref SNSTopicName
       Environment:
@@ -32,36 +32,40 @@ Resources:
         Schedule:
           Type: Schedule
           Properties:
-            Name: empty-s3Bucket-reporter
+            Name: review-unusedIAM-reporter
             Schedule: !Ref LambdaSchedule
       InlineCode: |
-        import os
-        import datetime
         import boto3
-                
-        s3 = boto3.client('s3')
+        from datetime import datetime, timedelta
+
+        client = boto3.client('iam')
+        resource = boto3.resource('iam')
         sns = boto3.client('sns')
+        time_now = datetime.now()
+        days_check = 60
+
+        # Get Roles
+        roles = client.list_roles()
 
         def lambda_handler(event, context):
             report = ''
-            
-            response = s3.list_buckets()
-            
-            for i in response['Buckets']:
-                try:
-                    bucketname = i['Name']
-                    response = s3.list_objects(Bucket=bucketname)
-                    if 'Contents' in response:
-                        print(bucketname)
-                        print("objects present")
-                    else:
-                        report += 'Empty Bucket Name: {0}. \n'.format(bucketname)
 
+            # Loop through the roles and print it's Last Used date
+            for r in roles['Roles']:
+                role = resource.Role(name=r['RoleName'])
+                try:
+                    if role.role_last_used:
+                        time_diff = time_now - role.role_last_used['LastUsedDate'].replace(tzinfo=None)    
+
+                        # Check diff is more than or equal to 90 days
+                        if time_diff.days > days_check:
+                            print('RoleName -', r['RoleName'],':',time_diff.days,'-days')
+                            report += 'RoleName : {0}, LastUsedDate : {1}.\n'.format(r['RoleName']).format(time_diff.days)
+                            
                 except Exception as e:
                     print(e)
                     pass
-                print('-----------------------------')
-
+                        
             if report:
                 print(report)
-                sns.publish(TopicArn=os.environ['SNS_TOPIC_ARN'], Subject='Empty S3 Bucket', Message=report)    
+                sns.publish(TopicArn=os.environ['SNS_TOPIC_ARN'], Subject='Review unused IAM Role', Message=report)
