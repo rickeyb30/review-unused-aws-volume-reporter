@@ -1,5 +1,5 @@
-# AWS Empty S3 Bucket Reporter
+# AWS Review Unused IAM Reporter
 
-AWS SAM app to get a daily email report of empty S3 bcuket.
+AWS SAM app to get a daily email report of unused IAM role.
 
 Available on the AWS Serverless App Repo!
