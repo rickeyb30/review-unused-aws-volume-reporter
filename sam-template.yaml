@@ -5,7 +5,7 @@ Parameters:
   SNSTopicName:
     Type: String
     Description: Name of the SNS topic where the report will be published.
-    Default: review-unused-IAM
+    Default: review-unused-iam
   LambdaSchedule:
     Type: String
     Description: |
