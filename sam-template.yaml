@@ -18,11 +18,11 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: review-unusedIAM-reporter
-      Runtime: python3.8
+      Runtime: python3.6
       Timeout: 900
       Handler: index.lambda_handler
       Policies:
-        - AmazonIAMReadOnlyAccess
+        - IAMReadOnlyAccess
         - SNSPublishMessagePolicy:
             TopicName: !Ref SNSTopicName
       Environment:
@@ -36,6 +36,7 @@ Resources:
             Schedule: !Ref LambdaSchedule
       InlineCode: |
         import boto3
+        import os
         from datetime import datetime, timedelta
 
         client = boto3.client('iam')
@@ -60,7 +61,7 @@ Resources:
                         # Check diff is more than or equal to 90 days
                         if time_diff.days > days_check:
                             print('RoleName -', r['RoleName'],':',time_diff.days,'-days')
-                            report += 'RoleName : {0}, LastUsedDate : {1}.\n'.format(r['RoleName']).format(time_diff.days)
+                            report += 'RoleName : {0}, LastUsedDate : {1}.\n'.format(r['RoleName'],time_diff.days)
                             
                 except Exception as e:
                     print(e)
