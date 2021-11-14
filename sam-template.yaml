@@ -5,7 +5,7 @@ Parameters:
   SNSTopicName:
     Type: String
     Description: Name of the SNS topic where the report will be published.
-    Default: review-unused-iam
+    Default: review-unused-volume
   LambdaSchedule:
     Type: String
     Description: |
@@ -14,15 +14,15 @@ Parameters:
     Default: cron(0 16 * * ? *)
 
 Resources:
-  UnusedIAMReporter:
+  UnusedVolumeReporter:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: review-unusedIAM-reporter
+      FunctionName: review-unusedVolume-reporter
       Runtime: python3.6
       Timeout: 900
       Handler: index.lambda_handler
       Policies:
-        - IAMReadOnlyAccess
+        - AmazonEC2ReadOnlyAccess
         - SNSPublishMessagePolicy:
             TopicName: !Ref SNSTopicName
       Environment:
@@ -32,41 +32,30 @@ Resources:
         Schedule:
           Type: Schedule
           Properties:
-            Name: review-unusedIAM-reporter
+            Name: review-unusedVolume-reporter
             Schedule: !Ref LambdaSchedule
       InlineCode: |
         import boto3
         import os
         from datetime import datetime, timedelta
 
-        client = boto3.client('iam')
-        resource = boto3.resource('iam')
+        ec2 = boto3.client('ec2')
         sns = boto3.client('sns')
         time_now = datetime.now()
         days_check = 60
 
-        # Get Roles
-        roles = client.list_roles()
-
         def lambda_handler(event, context):
             report = ''
-
-            # Loop through the roles and print it's Last Used date
-            for r in roles['Roles']:
-                role = resource.Role(name=r['RoleName'])
-                try:
-                    if role.role_last_used:
-                        time_diff = time_now - role.role_last_used['LastUsedDate'].replace(tzinfo=None)    
-
-                        # Check diff is more than or equal to 90 days
-                        if time_diff.days > days_check:
-                            print('RoleName -', r['RoleName'],':',time_diff.days,'-days')
-                            report += 'RoleName : {0}, LastUsedDate : {1}.\n'.format(r['RoleName'],time_diff.days)
-                            
-                except Exception as e:
-                    print(e)
-                    pass
-                        
+            result = ec2.describe_volumes(Filters=[{'Name': 'status', 'Values': ['available']}])
+            for volume in result['Volumes']:
+                volId= volume['VolumeId']
+                Time = volume['CreateTime']
+                time_diff = time_now - Time.replace(tzinfo=None)   
+                if 'Tags' not in volume:
+                    if time_diff.days > days_check:
+                        print('VolumeId -', volId,': Days -', time_diff.days)
+                        report += 'VolumeId : {0}, Days : {1}\n'.format(volId,time_diff.days)
+                    
             if report:
                 print(report)
                 sns.publish(TopicArn=os.environ['SNS_TOPIC_ARN'], Subject='Review unused IAM Role', Message=report)
