@@ -1,4 +1,4 @@
-# AWS Review Unused Volume Reporter
+# Review Unused AWS Volume Reporter
 
 AWS SAM app to get a daily email report of unused Volume.
 
