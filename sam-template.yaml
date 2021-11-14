@@ -58,4 +58,4 @@ Resources:
                     
             if report:
                 print(report)
-                sns.publish(TopicArn=os.environ['SNS_TOPIC_ARN'], Subject='Review unused IAM Role', Message=report)
+                sns.publish(TopicArn=os.environ['SNS_TOPIC_ARN'], Subject='Review unused AWS Volume', Message=report)
